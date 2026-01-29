@@ -3,14 +3,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+/* CHECK LOGIN */
 function isLoggedIn() {
     return isset($_SESSION['user']);
 }
 
-function isManager() {
-    return isLoggedIn() && $_SESSION['user']['role'] === 'manager';
-}
-
+/* REQUIRE LOGIN */
 function requireLogin() {
     if (!isLoggedIn()) {
         header("Location: login.php");
@@ -18,8 +16,15 @@ function requireLogin() {
     }
 }
 
+/* CHECK MANAGER */
+function isManager() {
+    return isset($_SESSION['user']) && $_SESSION['user']['role'] === 'manager';
+}
+
+/* REQUIRE MANAGER */
 function requireManager() {
     if (!isManager()) {
-        die("Access denied");
+        header("Location: index.php");
+        exit;
     }
 }

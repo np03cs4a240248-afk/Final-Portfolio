@@ -2,58 +2,66 @@
 require_once __DIR__ . "/../config/db.php";
 require_once __DIR__ . "/../config/auth.php";
 
-/* IF NOT LOGGED IN, SHOW SIGNUP FIRST */
-if (!isLoggedIn()) {
-    header("Location: signup.php");
-    exit;
-}
+/* IF NOT LOGGED IN, REDIRECT TO LOGIN */
 requireLogin();
-require "../partials/header.php";
 
-/* FETCH BOOKS USING PDO */
-$stmt = $pdo->query("SELECT * FROM books ORDER BY created_at DESC");
+/* FETCH BOOKS WITH AUTHOR + CATEGORY */
+$sql = "
+SELECT 
+    books.id,
+    books.title,
+    books.published_year,
+    books.isbn,
+    authors.name AS author,
+    categories.name AS genre
+FROM books
+JOIN authors ON books.author_id = authors.id
+JOIN categories ON books.category_id = categories.id
+ORDER BY books.created_at DESC
+";
+
+$stmt = $pdo->query($sql);
 $books = $stmt->fetchAll();
-?>
 
-<div style="position: relative; max-width: 400px; margin: 20px auto;">
-    <input type="text" id="search" placeholder="Search books..." autocomplete="off">
-    <div id="results"></div>
+require "../partials/header.php";
+?>
+<div class="page-head">
+  <div>
+    <h1>Library Dashboard</h1>
+    <p>Search books by title, author, category and year.</p>
+  </div>
+
+  <?php if (isManager()): ?>
+    <div class="head-actions">
+      <a class="btn" href="add.php">+ Add Book</a>
+      <a class="btn btn-ghost" href="add_student.php">+ Add Student</a>
+    </div>
+  <?php endif; ?>
+</div>
+
+<div class="card">
+  <div class="card-top">
+    <input type="text" id="search" placeholder="Search by title, author, category, year...">
+  </div>
+
+  <table>
+    <thead>...</thead>
+    <tbody id="bookTable">...</tbody>
+  </table>
 </div>
 
 
-<?php if (isManager()): ?>
-    <a class="btn" href="add.php">Add Book</a>
-<?php endif; ?>
+<!-- LIVE SEARCH SCRIPT -->
+<script>
+document.getElementById("search").addEventListener("keyup", function () {
+    const q = this.value.trim();
 
-<table>
-<tr>
-    <th>Title</th>
-    <th>Author</th>
-    <th>Genre</th>
-    <th>Year</th>
-    <th>ISBN</th>
-    <?php if (isManager()): ?><th>Actions</th><?php endif; ?>
-</tr>
-
-<?php foreach ($books as $row): ?>
-<tr>
-    <td><?= htmlspecialchars($row['title']) ?></td>
-    <td><?= htmlspecialchars($row['author']) ?></td>
-    <td><?= htmlspecialchars($row['genre']) ?></td>
-    <td><?= htmlspecialchars($row['published_year']) ?></td>
-    <td><?= htmlspecialchars($row['isbn']) ?></td>
-
-    <?php if (isManager()): ?>
-    <td>
-        <a href="edit.php?id=<?= $row['id'] ?>">Edit</a>
-        <a href="delete.php?id=<?= $row['id'] ?>"
-           onclick="return confirm('Are you sure?')">Delete</a>
-    </td>
-    <?php endif; ?>
-</tr>
-<?php endforeach; ?>
-</table>
-
-<script src="../assets/script.js"></script>
+    fetch("search.php?q=" + encodeURIComponent(q))
+        .then(res => res.text())
+        .then(html => {
+            document.getElementById("bookTable").innerHTML = html;
+        });
+});
+</script>
 
 <?php require "../partials/footer.php"; ?>
