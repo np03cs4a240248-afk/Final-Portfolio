@@ -2,27 +2,52 @@
 require __DIR__ . "/../config/db.php";
 require_once __DIR__ . "/../config/auth.php";
 
+/* ---------------- CSRF TOKEN SETUP ---------------- */
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+/* ------------------------------------------------- */
+
 $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
+    /* ---------- CSRF VALIDATION ---------- */
+    if (
+        !isset($_POST['csrf_token']) ||
+        !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])
+    ) {
+        die("Invalid CSRF token");
+    }
+    /* ------------------------------------ */
 
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    $stmt = $pdo->prepare("
+        SELECT id, full_name, email, password, role
+        FROM users
+        WHERE email = ?
+    ");
     $stmt->execute([$email]);
-    $user = $stmt->fetch();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user && password_verify($password, $user['password'])) {
+    if (!$user) {
+        $error = "Invalid login credentials";
+    } elseif (!password_verify($password, $user['password'])) {
+        $error = "Invalid login credentials";
+    } else {
         $_SESSION['user'] = [
             'id' => $user['id'],
             'name' => $user['full_name'],
             'role' => $user['role']
         ];
+
+        // Optional: regenerate token after successful login
+        unset($_SESSION['csrf_token']);
+
         header("Location: index.php");
         exit;
-    } else {
-        $error = "Invalid login credentials";
     }
 }
 ?>
@@ -35,6 +60,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <?php if ($error): ?>
         <p class="error"><?= htmlspecialchars($error) ?></p>
     <?php endif; ?>
+
+    <!-- CSRF TOKEN -->
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
 
     <input type="email" name="email" placeholder="Email" required>
     <input type="password" name="password" placeholder="Password" required>

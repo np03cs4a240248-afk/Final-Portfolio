@@ -1,47 +1,44 @@
 <?php
-require_once __DIR__ . "/../config/db.php";
+require __DIR__ . "/../config/db.php";
 require_once __DIR__ . "/../config/auth.php";
 
 requireLogin();
-if (!isManager()) {
-    die("Access denied");
-}
+requireManager();
 
-/* VALIDATE ID */
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    die("Invalid request");
-}
+$id = (int)($_GET['id'] ?? 0);
+if ($id <= 0) die("Invalid book id");
 
-$id = (int) $_GET['id'];
+$authors = $pdo->query("SELECT id, name FROM authors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
-/* FETCH BOOK */
 $stmt = $pdo->prepare("SELECT * FROM books WHERE id = ?");
 $stmt->execute([$id]);
-$book = $stmt->fetch();
+$book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$book) {
-    die("Book not found");
-}
+if (!$book) die("Book not found");
 
-/* UPDATE BOOK */
+$error = "";
+
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $title = trim($_POST['title'] ?? '');
+    $author_id = (int)($_POST['author_id'] ?? 0);
+    $category_id = (int)($_POST['category_id'] ?? 0);
+    $year = (int)($_POST['year'] ?? 0);
+    $isbn = trim($_POST['isbn'] ?? '');
 
-    $sql = "UPDATE books
-            SET title = ?, author = ?, genre = ?, published_year = ?, isbn = ?
-            WHERE id = ?";
+    if ($title === '' || $author_id <= 0 || $category_id <= 0 || $year <= 0) {
+        $error = "Please fill all required fields.";
+    } else {
+        $upd = $pdo->prepare("
+            UPDATE books
+            SET title = ?, author_id = ?, category_id = ?, published_year = ?, isbn = ?
+            WHERE id = ?
+        ");
+        $upd->execute([$title, $author_id, $category_id, $year, ($isbn === '' ? null : $isbn), $id]);
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        $_POST['title'],
-        $_POST['author'],
-        $_POST['genre'],
-        $_POST['year'],
-        $_POST['isbn'],
-        $id
-    ]);
-
-    header("Location: index.php");
-    exit;
+        header("Location: index.php");
+        exit;
+    }
 }
 ?>
 
@@ -50,37 +47,32 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 <form class="form" method="POST">
     <h3>Edit Book</h3>
 
-    <input
-        name="title"
-        value="<?= htmlspecialchars($book['title']) ?>"
-        required
-    >
+    <?php if ($error): ?>
+        <p class="error"><?= htmlspecialchars($error) ?></p>
+    <?php endif; ?>
 
-    <input
-        name="author"
-        value="<?= htmlspecialchars($book['author']) ?>"
-        required
-    >
+    <input name="title" value="<?= htmlspecialchars($book['title']) ?>" required>
 
-    <input
-        name="genre"
-        value="<?= htmlspecialchars($book['genre']) ?>"
-        required
-    >
+    <select name="author_id" required>
+        <?php foreach ($authors as $a): ?>
+            <option value="<?= (int)$a['id'] ?>" <?= ((int)$book['author_id'] === (int)$a['id']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($a['name']) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
 
-    <input
-        type="number"
-        name="year"
-        value="<?= htmlspecialchars($book['published_year']) ?>"
-        required
-    >
+    <select name="category_id" required>
+        <?php foreach ($categories as $c): ?>
+            <option value="<?= (int)$c['id'] ?>" <?= ((int)$book['category_id'] === (int)$c['id']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($c['name']) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
 
-    <input
-        name="isbn"
-        value="<?= htmlspecialchars($book['isbn']) ?>"
-    >
+    <input type="number" name="year" value="<?= (int)$book['published_year'] ?>" required>
+    <input name="isbn" value="<?= htmlspecialchars($book['isbn'] ?? '') ?>" placeholder="ISBN (optional)">
 
-    <button type="submit">Update Book</button>
+    <button type="submit">Save Changes</button>
 </form>
 
 <?php require "../partials/footer.php"; ?>

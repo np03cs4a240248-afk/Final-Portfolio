@@ -1,9 +1,15 @@
 <?php
 $host = "localhost";
-$db   = "library_management";
-$user = "root";
-$pass = "";
+$db   = "np03cs4a240248";
+$user = "np03cs4a240248";
+$pass = "cENW6U17Bf";
 $charset = "utf8mb4";
+
+// $host = "localhost";
+// $db   = "library_management";
+// $user = "root";
+// $pass = "";
+// $charset = "utf8mb4";
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
 
